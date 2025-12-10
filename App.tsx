@@ -1,158 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { StepIndicator } from './components/StepIndicator';
-import { StepInput, StepPreview, StepSelect } from './components/StepComponents';
+import { StepInput } from './components/StepComponents';
 import { DashboardPreview } from './components/DashboardPreview';
 import { LoadingScreen } from './components/LoadingScreen';
-import { parseMetricsLocal } from './utils/metricParser';
 import { generateDashboardPlan, generateFinalDashboard } from './services/geminiService';
-import { ParsedMetric, DashboardPlan, AIResponse, CategoryPlan } from './types';
+import { DashboardPlan, AIResponse } from './types';
 import { Activity } from 'lucide-react';
 
 const App: React.FC = () => {
   // State
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [rawMetrics, setRawMetrics] = useState<string>('');
-  const [parsedMetrics, setParsedMetrics] = useState<ParsedMetric[]>([]);
-  const [dashboardPlan, setDashboardPlan] = useState<DashboardPlan | null>(null);
-  const [selectedPanelIds, setSelectedPanelIds] = useState<Set<string>>(new Set());
+  const [userContext, setUserContext] = useState<string>('');
+  
   const [finalDashboard, setFinalDashboard] = useState<AIResponse | null>(null);
+  const [loadingLogs, setLoadingLogs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Handlers
-  const goToStep = (step: number) => {
-      setError(null);
-      setCurrentStep(step);
-  };
+  // Helper to append logs
+  const addLog = (msg: string) => setLoadingLogs(prev => [...prev, msg]);
 
-  // Step 1 -> 2
-  const handleInputNext = () => {
-    try {
-      const parsed = parseMetricsLocal(rawMetrics);
-      if (parsed.length === 0) throw new Error("No metrics found. Please check your input.");
-      setParsedMetrics(parsed);
-      goToStep(2);
-    } catch (e: any) {
-      setError(e.message);
-    }
-  };
-
-  // Step 2 -> 3 (Analysis)
-  const handleAnalyze = async () => {
-    goToStep(3);
-    try {
-      const plan = await generateDashboardPlan(rawMetrics);
-      setDashboardPlan(plan);
-      
-      // Auto-select all panels initially
-      const allIds = new Set<string>();
-      plan.categories.forEach(c => c.panels.forEach(p => allIds.add(p.id)));
-      setSelectedPanelIds(allIds);
-      
-      goToStep(4);
-    } catch (e: any) {
-      setError(e.message || "AI Analysis failed.");
-      goToStep(2); // Go back to preview on fail
-    }
-  };
-
-  // Step 4 Selection Logic
-  const togglePanel = (id: string) => {
-    const next = new Set(selectedPanelIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedPanelIds(next);
-  };
-
-  const toggleRow = (ids: string[], selected: boolean) => {
-    const next = new Set(selectedPanelIds);
-    ids.forEach(id => {
-        if (selected) next.add(id);
-        else next.delete(id);
-    });
-    setSelectedPanelIds(next);
-  };
-
-  // Step 4 -> 5 (Generate)
-  const handleGenerateFinal = async () => {
-    if (!dashboardPlan) return;
-    goToStep(5);
+  // Main Generator Logic (One-Click Flow)
+  const handleGenerateFullFlow = async () => {
+    if (!rawMetrics.trim()) return;
     
-    try {
-      // Filter the plan based on selection
-      const filteredPlan: DashboardPlan = {
-        ...dashboardPlan,
-        categories: dashboardPlan.categories.map(cat => ({
-            ...cat,
-            panels: cat.panels.filter(p => selectedPanelIds.has(p.id))
-        })).filter(cat => cat.panels.length > 0)
-      };
+    setError(null);
+    setCurrentStep(2); // Go to Processing
+    setLoadingLogs(['Initializing AI session...', 'Analyzing raw metrics structure...']);
 
-      const result = await generateFinalDashboard(rawMetrics, filteredPlan);
+    try {
+      // 1. Generate Plan
+      addLog('Identifying metric types and labels...');
+      await new Promise(r => setTimeout(r, 800)); // UX delay for readability
+      
+      addLog('Designing dashboard layout (Rows & Categories)...');
+      if (userContext) addLog(`Applying user context: "${userContext}"...`);
+
+      const plan: DashboardPlan = await generateDashboardPlan(rawMetrics, userContext);
+      
+      addLog(`Plan created: ${plan.categories.length} categories, ${plan.categories.reduce((acc, c) => acc + c.panels.length, 0)} panels found.`);
+      addLog('Generating PromQL queries for all panels...');
+
+      // 2. Generate Final JSON (Auto-select all)
+      const result = await generateFinalDashboard(rawMetrics, plan);
+      
+      addLog('Finalizing Grafana JSON structure...');
+      addLog('Done! Rendering dashboard...');
+      
+      await new Promise(r => setTimeout(r, 500)); // Brief pause at 100%
+      
       setFinalDashboard(result);
-      goToStep(6);
+      setCurrentStep(3); // Go to Result
+
     } catch (e: any) {
-      setError(e.message || "Generation failed.");
-      goToStep(4);
+      setError(e.message || "Generation failed. Please try again.");
+      setCurrentStep(1); // Go back to input
+      setLoadingLogs([]);
     }
   };
 
   const handleStartOver = () => {
     setRawMetrics('');
-    setParsedMetrics([]);
-    setDashboardPlan(null);
+    setUserContext('');
     setFinalDashboard(null);
-    goToStep(1);
-  };
-
-  // Render Content
-  const renderStepContent = () => {
-    switch (currentStep) {
-      case 1:
-        return <StepInput value={rawMetrics} onChange={setRawMetrics} onNext={handleInputNext} />;
-      case 2:
-        return <StepPreview metrics={parsedMetrics} onBack={() => goToStep(1)} onNext={handleAnalyze} />;
-      case 3:
-        return <LoadingScreen stepName="AI Analysis" message="Identifying metrics, groupings, and visualization types..." />;
-      case 4:
-        return dashboardPlan && (
-           <StepSelect 
-             plan={dashboardPlan} 
-             selectedIds={selectedPanelIds} 
-             onToggle={togglePanel} 
-             onToggleAllRow={toggleRow}
-             onBack={() => goToStep(2)}
-             onGenerate={handleGenerateFinal}
-           />
-        );
-      case 5:
-        return <LoadingScreen stepName="Generating Dashboard" message="Writing PromQL queries and configuring panels..." />;
-      case 6:
-        return (
-            <div className="h-full flex flex-col">
-                <div className="mb-4 flex justify-between items-center">
-                    <button onClick={handleStartOver} className="text-sm text-slate-500 hover:text-primary-600 font-medium">
-                        ← Start Over
-                    </button>
-                    <span className="text-sm text-green-600 font-medium flex items-center gap-1">
-                        Success! Dashboard generated.
-                    </span>
-                </div>
-                <div className="flex-1 overflow-hidden">
-                    <DashboardPreview data={finalDashboard} />
-                </div>
-            </div>
-        );
-      default:
-        return null;
-    }
+    setLoadingLogs([]);
+    setCurrentStep(1);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen flex flex-col bg-slate-50 font-sans text-slate-900 overflow-y-auto">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      <header className="bg-white border-b border-slate-200 shrink-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <div className="bg-primary-50 p-2 rounded-lg">
               <Activity className="text-primary-600" size={24} />
             </div>
@@ -162,24 +82,57 @@ const App: React.FC = () => {
               </h1>
             </div>
           </div>
-          <div className="text-sm text-slate-500 font-medium hidden sm:block">
-            Powered by Gemini 3.0 Pro
+          <div className="flex items-center gap-4">
+             {currentStep === 3 && (
+                <button onClick={handleStartOver} className="text-sm text-slate-500 hover:text-primary-600 font-medium px-3 py-1.5 rounded hover:bg-slate-50 transition-colors">
+                    Start New Dashboard
+                </button>
+             )}
+             <div className="text-xs font-semibold bg-slate-100 text-slate-500 px-3 py-1 rounded-full hidden sm:block">
+                Gemini 3.0 Pro
+             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col">
-        <StepIndicator currentStep={currentStep} />
+      <main className="flex-1 flex flex-col min-h-0 relative">
+        <div className="max-w-7xl mx-auto px-6 w-full shrink-0">
+             <StepIndicator currentStep={currentStep} />
+        </div>
         
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2">
-            <span className="font-bold">Error:</span> {error}
+          <div className="max-w-7xl mx-auto px-6 w-full mb-6">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2 animate-pulse">
+                <span className="font-bold">Error:</span> {error}
+            </div>
           </div>
         )}
 
-        <div className="flex-1 min-h-0">
-            {renderStepContent()}
+        <div className="flex-1 min-h-0 w-full max-w-7xl mx-auto px-6 pb-6 flex flex-col">
+            {currentStep === 1 && (
+                <div className="flex-1 min-h-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <StepInput 
+                        value={rawMetrics} 
+                        context={userContext}
+                        onValueChange={setRawMetrics}
+                        onContextChange={setUserContext}
+                        onGenerate={handleGenerateFullFlow} 
+                    />
+                </div>
+            )}
+
+            {currentStep === 2 && (
+                <div className="flex-1 flex flex-col items-center justify-center animate-in zoom-in-95 duration-500">
+                    <LoadingScreen logs={loadingLogs} />
+                </div>
+            )}
+
+            {currentStep === 3 && finalDashboard && (
+                <div className="flex-1 min-h-0 border border-slate-200 rounded-xl shadow-lg bg-white overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+                    <DashboardPreview data={finalDashboard} />
+                </div>
+            )}
         </div>
       </main>
     </div>

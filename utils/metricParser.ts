@@ -15,6 +15,7 @@ export const parseMetricsLocal = (input: string): ParsedMetric[] => {
         const name = parts[2];
         const help = parts.slice(3).join(' ');
         if (!metricMap.has(name)) {
+            // Defer type inference until we see the value or just default to unknown for now
             metricMap.set(name, { name, type: 'unknown', help, labels: [] });
         } else {
             metricMap.get(name)!.help = help;
@@ -40,11 +41,27 @@ export const parseMetricsLocal = (input: string): ParsedMetric[] => {
         const labelStr = match[2];
         
         if (!metricMap.has(name)) {
-            metricMap.set(name, { name, type: 'unknown', help: '', labels: [] });
+            // Automatic Type Inference based on naming conventions
+            let inferredType = 'unknown';
+            if (name.endsWith('_total')) inferredType = 'counter';
+            else if (name.endsWith('_bucket')) inferredType = 'histogram';
+            else if (name.endsWith('_sum')) inferredType = 'histogram';
+            else if (name.endsWith('_count')) inferredType = 'histogram';
+            else if (name.endsWith('_info')) inferredType = 'gauge';
+            else if (name.endsWith('_seconds')) inferredType = 'summary'; // loose heuristic
+
+            metricMap.set(name, { name, type: inferredType, help: '', labels: [] });
         }
         
         const entry = metricMap.get(name)!;
         
+        // If type is still unknown, try to infer it now
+        if (entry.type === 'unknown') {
+            if (name.endsWith('_total')) entry.type = 'counter';
+            else if (name.endsWith('_bucket') || name.endsWith('_sum') || name.endsWith('_count')) entry.type = 'histogram';
+            else if (name.endsWith('_info')) entry.type = 'gauge';
+        }
+
         if (labelStr) {
            // Parse labels roughly: key="val", key2="val"
            // Simple regex split to get keys

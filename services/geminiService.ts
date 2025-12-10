@@ -15,13 +15,38 @@ const cleanResponse = (text: string | undefined): string => {
   return text.replace(/```json\n?|```/g, '').trim();
 };
 
-export const generateDashboardPlan = async (metrics: string): Promise<DashboardPlan> => {
+export const generateDashboardPlan = async (metrics: string, userContext?: string): Promise<DashboardPlan> => {
   const ai = getAIClient();
   
+  const contextInstruction = userContext 
+    ? `\n\nUSER CONTEXT / REQUIREMENTS: "${userContext}"\nPrioritize panels that align with this context.` 
+    : "";
+
   const systemInstruction = `
     You are a Grafana Solutions Architect.
     Analyze the provided Prometheus metrics.
     Propose a logical dashboard structure with Categories (Rows) and Panels.
+    
+    ${contextInstruction}
+
+    ## CRITICAL LAYOUT RULES (Grafana uses 24-column grid):
+
+    ### Panel Sizing (MUST follow exactly):
+    | Panel Type | Width | Height |
+    |------------|-------|--------|
+    | stat       | 6     | 4      |
+    | gauge      | 6     | 4      |
+    | timeseries | 12    | 8      |
+    | heatmap    | 12    | 8      |
+
+    ### Row Layout Rules:
+    1. Each row's panels MUST sum to exactly 24 width
+    2. All panels in the same row MUST have the same height
+    3. Do NOT mix stat (height=4) and timeseries (height=8) in the same row
+
+    ### Valid Row Examples:
+    - Overview row: 4 stat panels (6+6+6+6=24, all height=4)
+    - Trends row: 2 timeseries panels (12+12=24, all height=8)
     
     For each panel:
     1. Identify the best visualization type (Timeseries for counters/rates, Stat for gauges/current values, Heatmap for histograms).
@@ -135,8 +160,9 @@ export const generateFinalDashboard = async (metrics: string, plan: DashboardPla
                       unit: { type: Type.STRING },
                       min: { type: Type.NUMBER, nullable: true },
                       max: { type: Type.NUMBER, nullable: true },
+                      metrics: { type: Type.ARRAY, items: { type: Type.STRING } }
                     },
-                    required: ["title", "type", "promql", "unit", "description"]
+                    required: ["title", "type", "promql", "unit", "description", "metrics"]
                   }
                 }
               },

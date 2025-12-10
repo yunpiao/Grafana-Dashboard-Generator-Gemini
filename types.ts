@@ -44,6 +44,7 @@ export interface GeneratedPanel {
   unit: string;
   min?: number;
   max?: number;
+  metrics: string[];
 }
 
 export interface GeneratedCategory {

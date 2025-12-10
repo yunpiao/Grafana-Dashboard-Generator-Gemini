@@ -1,12 +1,25 @@
-import { AIResponse, GrafanaPanel, PanelType } from "../types";
+import { AIResponse, GrafanaPanel, PanelType, GeneratedPanel } from "../types";
 
 export const buildGrafanaDashboardJson = (aiData: AIResponse) => {
   const panels: GrafanaPanel[] = [];
   let panelIdCounter = 1;
   let currentY = 0;
 
+  // Helper to get dimensions
+  const getPanelDim = (type: PanelType) => {
+    const isStat = type === PanelType.Stat || type === PanelType.Gauge;
+    // Stat: 6x4, Chart: 12x8
+    return { w: isStat ? 6 : 12, h: isStat ? 4 : 8 };
+  };
+
+  // Helper to prioritize panels for sorting (Stats first to group by height)
+  const getPanelPriority = (type: PanelType) => {
+    if (type === PanelType.Stat || type === PanelType.Gauge) return 1;
+    return 2;
+  };
+
   aiData.categories.forEach((category) => {
-    // Add a Row panel for the category
+    // 1. Add Category Row
     panels.push({
       id: panelIdCounter++,
       gridPos: { h: 1, w: 24, x: 0, y: currentY },
@@ -20,26 +33,36 @@ export const buildGrafanaDashboardJson = (aiData: AIResponse) => {
     });
     currentY += 1;
 
-    // Track row flow
+    // 2. Sort panels to group by height (Stats first, then Charts)
+    // This helps satisfy the "same height per row" rule naturally
+    const sortedPanels = [...category.panels].sort((a, b) => {
+      return getPanelPriority(a.type) - getPanelPriority(b.type);
+    });
+
+    // 3. Layout Logic
     let currentX = 0;
-    let maxRowHeight = 0;
+    let currentRowHeight = 0;
 
-    category.panels.forEach((panel) => {
-      const isStat = panel.type === PanelType.Stat || panel.type === PanelType.Gauge;
-      const width = isStat ? 4 : 12; // Stats are smaller (1/6th), Graphs are half (1/2)
-      const height = isStat ? 4 : 8;
+    sortedPanels.forEach((panel) => {
+      const { w, h } = getPanelDim(panel.type);
 
-      // Check if we need to wrap to a new line
-      if (currentX + width > 24) {
-        currentY += maxRowHeight;
-        currentX = 0;
-        maxRowHeight = 0;
+      // Check for Line Break conditions:
+      // 1. Width overflow
+      // 2. Height mismatch with current row (must start new row)
+      const widthOverflow = currentX + w > 24;
+      const heightMismatch = currentRowHeight > 0 && currentRowHeight !== h;
+
+      if (widthOverflow || heightMismatch) {
+        currentY += currentRowHeight; // Move Y down by the height of the finished row
+        currentX = 0;                // Reset X
+        currentRowHeight = 0;        // Reset Row Height
       }
 
+      // Add Panel
       panels.push({
         id: panelIdCounter++,
-        gridPos: { h: height, w: width, x: currentX, y: currentY },
-        type: panel.type === PanelType.Gauge ? 'stat' : panel.type, // Map 'gauge' to 'stat' or 'gauge' depending on preference, usually 'stat' or 'gauge' viz
+        gridPos: { h, w, x: currentX, y: currentY },
+        type: panel.type === PanelType.Gauge ? 'gauge' : (panel.type === PanelType.Stat ? 'stat' : panel.type),
         title: panel.title,
         description: panel.description,
         datasource: { type: "prometheus", uid: "${datasource}" },
@@ -47,7 +70,7 @@ export const buildGrafanaDashboardJson = (aiData: AIResponse) => {
           {
             expr: panel.promql,
             refId: "A",
-            legendFormat: "{{instance}}"
+            legendFormat: "{{instance}}" // Simple default, AI can improve this in prompt later
           }
         ],
         fieldConfig: {
@@ -102,7 +125,7 @@ export const buildGrafanaDashboardJson = (aiData: AIResponse) => {
                sort: "none"
            },
            // Specific options for Stat/Gauge panels
-           ...(isStat ? {
+           ...((panel.type === PanelType.Stat || panel.type === PanelType.Gauge) ? {
              reduceOptions: {
                values: false,
                calcs: ["lastNotNull"],
@@ -117,16 +140,15 @@ export const buildGrafanaDashboardJson = (aiData: AIResponse) => {
         }
       });
 
-      // Advance X
-      currentX += width;
-      // Track max height in this current row to know how much to jump when wrapping
-      maxRowHeight = Math.max(maxRowHeight, height);
+      // Update Cursors
+      currentX += w;
+      currentRowHeight = h; // Set current row height (should be consistent due to sorting/checks)
     });
-    
-    // Advance Y after the category is done (plus the height of the last row)
-    currentY += maxRowHeight > 0 ? maxRowHeight : 0;
-    // Add a little breathing room
-    currentY += 1; 
+
+    // Move Y past the last row of this category
+    if (currentRowHeight > 0) {
+      currentY += currentRowHeight;
+    }
   });
 
   return {
