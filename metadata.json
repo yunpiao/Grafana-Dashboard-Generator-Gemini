@@ -1,0 +1,5 @@
+{
+  "name": "Prometheus to Grafana AI",
+  "description": "Generate professional Grafana dashboards from Prometheus metrics using AI.",
+  "requestFramePermissions": []
+}
