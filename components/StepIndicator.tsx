@@ -1,14 +1,16 @@
 import React from 'react';
-import { Check, Edit3, Cpu, Layout } from 'lucide-react';
+import { Check, Edit3, Cpu, Layout, ListChecks } from 'lucide-react';
 
 interface StepIndicatorProps {
   currentStep: number;
+  totalSteps?: number;
 }
 
 const steps = [
-  { id: 1, label: 'Input', fullLabel: 'Input & Context', icon: Edit3 },
-  { id: 2, label: 'Process', fullLabel: 'AI Processing', icon: Cpu },
-  { id: 3, label: 'Result', fullLabel: 'Result & Fine-tune', icon: Layout },
+  { id: 1, label: 'Input', fullLabel: 'Input Metrics', icon: Edit3 },
+  { id: 2, label: 'Plan', fullLabel: 'Edit Plan', icon: ListChecks },
+  { id: 3, label: 'Generate', fullLabel: 'Generate JSON', icon: Cpu },
+  { id: 4, label: 'Preview', fullLabel: 'Preview & Export', icon: Layout },
 ];
 
 export const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => {

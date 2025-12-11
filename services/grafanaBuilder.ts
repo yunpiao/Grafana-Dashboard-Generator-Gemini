@@ -5,11 +5,37 @@ export const buildGrafanaDashboardJson = (aiData: AIResponse) => {
   let panelIdCounter = 1;
   let currentY = 0;
 
-  // Helper to get dimensions
-  const getPanelDim = (type: PanelType) => {
-    const isStat = type === PanelType.Stat || type === PanelType.Gauge;
-    // Stat: 6x4, Chart: 12x8
-    return { w: isStat ? 6 : 12, h: isStat ? 4 : 8 };
+  // Helper to check if panel is a small stat-like panel
+  const isStatType = (type: PanelType) => type === PanelType.Stat || type === PanelType.Gauge;
+
+  // Helper to get chart width based on count per row (max 24 width)
+  // 1 chart → 24, 2 charts → 12, 3 charts → 8, 4+ charts → 6
+  const getChartWidth = (chartCount: number): number => {
+    if (chartCount <= 1) return 24;
+    if (chartCount === 2) return 12;
+    if (chartCount === 3) return 8;
+    return 6; // 4+ charts
+  };
+
+  // Helper to get dimensions (needs chartCount for dynamic width)
+  const getPanelDim = (type: PanelType, chartCount: number = 2) => {
+    if (isStatType(type)) {
+      return { w: 6, h: 4 }; // Stat: 6x4
+    }
+    return { w: getChartWidth(chartCount), h: 8 }; // Chart: dynamic width x 8
+  };
+
+  // Helper to map internal type to Grafana panel type
+  const getGrafanaType = (type: PanelType): string => {
+    switch (type) {
+      case PanelType.Stat: return 'stat';
+      case PanelType.Gauge: return 'gauge';
+      case PanelType.Timeseries: return 'timeseries';
+      case PanelType.Heatmap: return 'heatmap';
+      case PanelType.Histogram: return 'barchart'; // Prometheus buckets render best as BarChart
+      case PanelType.Logs: return 'logs';
+      default: return 'timeseries';
+    }
   };
 
   // Helper to prioritize panels for sorting (Stats first to group by height)
@@ -39,12 +65,16 @@ export const buildGrafanaDashboardJson = (aiData: AIResponse) => {
       return getPanelPriority(a.type) - getPanelPriority(b.type);
     });
 
+    // Count chart-type panels for dynamic width calculation
+    const chartPanels = sortedPanels.filter(p => !isStatType(p.type));
+    const chartCount = chartPanels.length;
+
     // 3. Layout Logic
     let currentX = 0;
     let currentRowHeight = 0;
 
     sortedPanels.forEach((panel) => {
-      const { w, h } = getPanelDim(panel.type);
+      const { w, h } = getPanelDim(panel.type, chartCount);
 
       // Check for Line Break conditions:
       // 1. Width overflow
@@ -62,7 +92,7 @@ export const buildGrafanaDashboardJson = (aiData: AIResponse) => {
       panels.push({
         id: panelIdCounter++,
         gridPos: { h, w, x: currentX, y: currentY },
-        type: panel.type === PanelType.Gauge ? 'gauge' : (panel.type === PanelType.Stat ? 'stat' : panel.type),
+        type: getGrafanaType(panel.type),
         title: panel.title,
         description: panel.description,
         datasource: { type: "prometheus", uid: "${datasource}" },
@@ -70,14 +100,36 @@ export const buildGrafanaDashboardJson = (aiData: AIResponse) => {
           {
             expr: panel.promql,
             refId: "A",
-            legendFormat: "{{instance}}" // Simple default, AI can improve this in prompt later
+            legendFormat: panel.type === PanelType.Histogram ? "{{le}}" : "{{instance}}",
+            instant: panel.type === PanelType.Histogram,
+            format: panel.type === PanelType.Histogram ? "heatmap" : "time_series"
           }
         ],
+        // Add transformations for Histogram to convert cumulative buckets to individual counts
+        ...(panel.type === PanelType.Histogram ? {
+          transformations: [
+            {
+              id: "histogram",
+              options: {
+                bucketCount: 30,
+                bucketSize: "",
+                combine: false
+              }
+            }
+          ]
+        } : {}),
         fieldConfig: {
           defaults: {
             unit: panel.unit || "short",
             min: panel.min,
             max: panel.max,
+            // Value mappings for bool unit (0 → False, 1 → True)
+            ...(panel.unit === 'bool' ? {
+              mappings: [
+                { type: "value", options: { "0": { text: "False", color: "red" } } },
+                { type: "value", options: { "1": { text: "True", color: "green" } } }
+              ]
+            } : {}),
             color: {
                mode: "palette-classic"
             },
@@ -136,6 +188,29 @@ export const buildGrafanaDashboardJson = (aiData: AIResponse) => {
              colorMode: "value",
              graphMode: "area",
              justifyMode: "auto"
+           } : {}),
+           // Specific options for Heatmap
+           ...(panel.type === PanelType.Heatmap ? {
+             calculate: false,
+             cellGap: 1,
+             color: {
+               mode: "scheme",
+               scheme: "Oranges",
+               steps: 64
+             },
+             yAxis: {
+               axisPlacement: "left"
+             }
+           } : {}),
+           // Specific options for Histogram (BarChart)
+           ...(panel.type === PanelType.Histogram ? {
+             orientation: "auto",
+             showValue: "never",
+             groupWidth: 0.8,
+             barWidth: 0.97,
+             legend: { showLegend: false }, // Too many buckets usually
+             xTickLabelRotation: 0,
+             stacking: "normal" // Normal stacking for bars
            } : {})
         }
       });

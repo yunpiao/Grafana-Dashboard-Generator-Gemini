@@ -2,7 +2,8 @@ import React from 'react';
 import { GeneratedPanel, PanelType } from '../types';
 import { 
   LineChart, Line, ResponsiveContainer, AreaChart, Area, 
-  CartesianGrid, XAxis, YAxis, Tooltip, Legend 
+  CartesianGrid, XAxis, YAxis, Tooltip, Legend,
+  BarChart, Bar, Cell
 } from 'recharts';
 import { Info, MoreVertical } from 'lucide-react';
 
@@ -33,22 +34,92 @@ const generateMockData = (type: string) => {
   return data;
 };
 
+// Generate histogram bucket data
+const generateHistogramData = () => {
+  const buckets = ['0.005', '0.01', '0.025', '0.05', '0.1', '0.25', '0.5', '1', '+Inf'];
+  return buckets.map((le, idx) => ({
+    bucket: le,
+    count: Math.floor(Math.random() * 500 + 100 * (9 - idx)), // Decreasing counts
+  }));
+};
+
+// Generate heatmap data (time x bucket matrix) with a "hot spot"
+const generateHeatmapData = () => {
+  const rows = 10; // buckets
+  const cols = 20; // time points
+  const data: number[][] = [];
+  
+  // Create a distribution center that moves slightly over time
+  let centerRow = 4;
+  
+  for (let r = 0; r < rows; r++) {
+    const row: number[] = [];
+    for (let c = 0; c < cols; c++) {
+      // Drift the center
+      centerRow += (Math.random() - 0.5) * 0.5;
+      
+      // Distance from center (Gaussian-ish profile)
+      const dist = Math.abs(r - centerRow);
+      const baseVal = Math.max(0, 100 * Math.exp(-dist * dist / 2));
+      
+      // Add noise
+      const val = Math.floor(baseVal * (0.8 + Math.random() * 0.4));
+      row.push(val > 5 ? val : 0); // Cutoff low noise
+    }
+    data.push(row);
+  }
+  // Reverse to put high buckets (larger le) at top usually, 
+  // but Grafana heatmap Y-axis usually puts small values at bottom.
+  // Let's assume row 0 is small latency, row N is high latency.
+  return data.reverse(); 
+};
+
+// Heatmap color scale (Opacity based on global max)
+const getHeatColor = (value: number, max: number) => {
+  if (value === 0) return 'transparent';
+  const ratio = Math.pow(value / max, 0.7); // Slight curve to make mid-values visible
+  // Grafana classic heatmap orange scheme
+  return `rgba(255, 152, 48, ${ratio})`; 
+};
+
 // Grafana-like colors (Light Theme)
 const COLORS = {
   green: '#73BF69',
   yellow: '#FADE2A',
   blue: '#5794F2',
+  orange: '#FF9830',
+  red: '#F2495C',
   grid: '#E7E7E9', // Light grey grid
   text: '#4F5766'  // Slate text
 };
 
 export const PanelPreview: React.FC<PanelPreviewProps> = ({ panel }) => {
   const isStat = panel.type === PanelType.Stat || panel.type === PanelType.Gauge;
+  const isHeatmap = panel.type === PanelType.Heatmap;
+  const isHistogram = panel.type === PanelType.Histogram;
+  
   const data = React.useMemo(() => generateMockData(panel.type), [panel.type]);
-  const lastValue = data[data.length - 1].value;
+  const histogramData = React.useMemo(() => generateHistogramData(), []);
+  const heatmapData = React.useMemo(() => generateHeatmapData(), []);
+  
+  // Calculate global max for heatmap normalization
+  const heatmapMax = React.useMemo(() => {
+    let max = 0;
+    heatmapData.forEach(row => row.forEach(val => max = Math.max(max, val)));
+    return max || 1;
+  }, [heatmapData]);
+
+  const isBoolUnit = (panel.unit || '').toLowerCase() === 'bool';
+  const statSeries = React.useMemo(() => {
+    if (!isBoolUnit) return data;
+    return data.map(d => ({ ...d, value: d.value > 50 ? 1 : 0 }));
+  }, [data, isBoolUnit]);
+  const lastValue = statSeries[statSeries.length - 1].value;
 
   // Set fixed height based on panel type
   const heightClass = isStat ? 'h-[120px]' : 'h-[240px]';
+  const displayValue = isBoolUnit ? (lastValue ? 'True' : 'False') : lastValue;
+  const displayUnit = isBoolUnit ? '' : (panel.unit || 'value');
 
   // Custom Tooltip to look like Grafana's
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -67,6 +138,25 @@ export const PanelPreview: React.FC<PanelPreviewProps> = ({ panel }) => {
       );
     }
     return null;
+  };
+
+  // Custom Legend: left-aligned, auto-wrap, contained within panel
+  const CustomLegend = (props: any) => {
+    const { payload } = props;
+    if (!payload) return null;
+    return (
+      <div 
+        className="text-[9px] text-slate-500 flex flex-wrap items-start gap-x-3 gap-y-0.5 pl-10 pr-2"
+        style={{ maxHeight: 24, overflow: 'hidden', lineHeight: '11px' }}
+      >
+        {payload.map((entry: any, idx: number) => (
+          <span key={idx} className="inline-flex items-center gap-0.5 shrink-0">
+            <span className="w-1.5 h-1.5 rounded-sm shrink-0" style={{ backgroundColor: entry.color }} />
+            <span className="truncate max-w-[140px]">{entry.value}</span>
+          </span>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -91,11 +181,13 @@ export const PanelPreview: React.FC<PanelPreviewProps> = ({ panel }) => {
             <div className="flex items-baseline gap-1">
               <span 
                 className="text-4xl font-semibold tracking-tight leading-none"
-                style={{ color: lastValue > 80 ? '#F2495C' : '#73BF69' }} // Red if high, Green otherwise
+                style={{ color: isBoolUnit ? '#73BF69' : (lastValue > 80 ? '#F2495C' : '#73BF69') }} // Bool always green
               >
-                {lastValue}
+                {displayValue}
               </span>
-              <span className="text-sm text-slate-500 font-medium">{panel.unit || 'value'}</span>
+              {displayUnit && (
+                <span className="text-sm text-slate-500 font-medium">{displayUnit}</span>
+              )}
             </div>
             
             {/* Sparkline background */}
@@ -107,6 +199,57 @@ export const PanelPreview: React.FC<PanelPreviewProps> = ({ panel }) => {
                </ResponsiveContainer>
             </div>
           </div>
+        ) : isHeatmap ? (
+          // Heatmap Panel
+          <div className="h-full flex flex-col">
+            <div className="flex-1 grid gap-[1px] p-1" style={{ gridTemplateRows: `repeat(${heatmapData.length}, 1fr)` }}>
+              {heatmapData.map((row, rowIdx) => {
+                return (
+                  <div key={rowIdx} className="flex gap-[1px]">
+                    {row.map((val, colIdx) => (
+                      <div
+                        key={colIdx}
+                        className="flex-1 rounded-sm transition-colors"
+                        style={{ backgroundColor: getHeatColor(val, heatmapMax) }}
+                        title={`Bucket ${rowIdx + 1}, Time ${colIdx + 1}: ${val}`}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-between text-[9px] text-slate-400 px-1 pt-1">
+              <span>0.005s</span>
+              <span>0.1s</span>
+              <span>1s</span>
+              <span>+Inf</span>
+            </div>
+          </div>
+        ) : isHistogram ? (
+          // Histogram Panel (Bar Chart)
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={histogramData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={COLORS.grid} />
+              <XAxis 
+                dataKey="bucket" 
+                tick={{ fontSize: 9, fill: COLORS.text }} 
+                tickLine={false}
+                axisLine={{ stroke: COLORS.grid }}
+                label={{ value: 'le (seconds)', position: 'insideBottom', offset: -5, fontSize: 9, fill: COLORS.text }}
+              />
+              <YAxis 
+                tick={{ fontSize: 9, fill: COLORS.text }} 
+                tickLine={false}
+                axisLine={false}
+                width={40}
+              />
+              <Tooltip 
+                formatter={(value: number) => [value, 'Count']}
+                contentStyle={{ fontSize: 11, backgroundColor: '#1e293b', border: 'none', borderRadius: 4, color: '#fff' }}
+              />
+              <Bar dataKey="count" fill={COLORS.blue} opacity={0.8} radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         ) : (
           // Timeseries Panel
           <ResponsiveContainer width="100%" height="100%">
@@ -137,11 +280,17 @@ export const PanelPreview: React.FC<PanelPreviewProps> = ({ panel }) => {
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend 
-                verticalAlign="bottom" 
-                height={20} 
+                verticalAlign="bottom"
+                align="left"
                 iconType="rect"
-                iconSize={10}
-                wrapperStyle={{ fontSize: '11px', paddingTop: '10px', color: COLORS.text }}
+                iconSize={9}
+                wrapperStyle={{ 
+                  width: '100%',
+                  paddingTop: 2,
+                  overflowX: 'auto',
+                  overflowY: 'hidden'
+                }}
+                content={<CustomLegend />}
               />
               <Area 
                 type="monotone" 

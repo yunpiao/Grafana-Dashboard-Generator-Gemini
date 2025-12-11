@@ -1,21 +1,90 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { SAMPLE_METRICS } from '../constants';
-import { Play, FileText, Upload, Link as LinkIcon, AlertCircle } from 'lucide-react';
+import { ParsedMetric } from '../types';
+import { parseMetricsLocal } from '../utils/metricParser';
+import { 
+  Play, FileText, Upload,
+  Hash, Tag, BarChart3, Activity, Gauge, Timer, ChevronRight,
+  Check, Square, CheckSquare
+} from 'lucide-react';
 
-// --- Step 1: Input & Context ---
+// --- Step 1: Input with Auto-Parse Preview ---
 interface StepInputProps {
   value: string;
-  context: string;
   onValueChange: (val: string) => void;
-  onContextChange: (val: string) => void;
   onGenerate: () => void;
 }
 
-export const StepInput: React.FC<StepInputProps> = ({ value, context, onValueChange, onContextChange, onGenerate }) => {
-  const [activeTab, setActiveTab] = useState<'text' | 'file' | 'url'>('text');
-  const [urlInput, setUrlInput] = useState('');
-  const [urlError, setUrlError] = useState('');
+export const StepInput: React.FC<StepInputProps> = ({ value, onValueChange, onGenerate }) => {
+  const [activeTab, setActiveTab] = useState<'text' | 'file'>('text');
+  const [selectedMetrics, setSelectedMetrics] = useState<Set<string>>(new Set());
   const lineCount = value.split('\n').filter(l => l.trim().length > 0).length;
+
+  // Auto-parse metrics when value changes
+  const parsedMetrics = useMemo(() => {
+    if (!value.trim()) return [];
+    return parseMetricsLocal(value);
+  }, [value]);
+
+  // Auto-select all metrics when parsed metrics change
+  useEffect(() => {
+    if (parsedMetrics.length > 0) {
+      setSelectedMetrics(new Set(parsedMetrics.map(m => m.name)));
+    }
+  }, [parsedMetrics]);
+
+  const toggleMetric = (name: string) => {
+    const next = new Set(selectedMetrics);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    setSelectedMetrics(next);
+  };
+
+  const toggleTypeAll = (metrics: ParsedMetric[]) => {
+    const names = metrics.map(m => m.name);
+    const allSelected = names.every(n => selectedMetrics.has(n));
+    const next = new Set(selectedMetrics);
+    if (allSelected) {
+      names.forEach(n => next.delete(n));
+    } else {
+      names.forEach(n => next.add(n));
+    }
+    setSelectedMetrics(next);
+  };
+
+  const selectAll = () => setSelectedMetrics(new Set(parsedMetrics.map(m => m.name)));
+  const selectNone = () => setSelectedMetrics(new Set());
+
+  // Group by type for display
+  const metricsByType = useMemo(() => {
+    const grouped: Record<string, ParsedMetric[]> = {};
+    parsedMetrics.forEach(m => {
+      const type = m.type || 'unknown';
+      if (!grouped[type]) grouped[type] = [];
+      grouped[type].push(m);
+    });
+    return grouped;
+  }, [parsedMetrics]);
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'counter': return Activity;
+      case 'gauge': return Gauge;
+      case 'histogram': return BarChart3;
+      case 'summary': return Timer;
+      default: return Hash;
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'counter': return 'text-blue-600 bg-blue-50';
+      case 'gauge': return 'text-green-600 bg-green-50';
+      case 'histogram': return 'text-orange-600 bg-orange-50';
+      case 'summary': return 'text-purple-600 bg-purple-50';
+      default: return 'text-slate-600 bg-slate-50';
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -29,19 +98,6 @@ export const StepInput: React.FC<StepInputProps> = ({ value, context, onValueCha
     reader.readAsText(file);
   };
 
-  const handleUrlFetch = async () => {
-    if (!urlInput) return;
-    setUrlError('');
-    try {
-        const res = await fetch(urlInput);
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const text = await res.text();
-        onValueChange(text);
-        setActiveTab('text');
-    } catch (e) {
-        setUrlError("Could not fetch URL directly (likely CORS). Please copy/paste the content manually.");
-    }
-  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-full max-w-7xl mx-auto">
@@ -61,12 +117,6 @@ export const StepInput: React.FC<StepInputProps> = ({ value, context, onValueCha
                     className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium border-b-2 transition-all hover:bg-slate-50 whitespace-nowrap ${activeTab === 'file' ? 'border-primary-500 text-primary-700 bg-white' : 'border-transparent text-slate-500'}`}
                 >
                     <Upload size={16} /> Upload File
-                </button>
-                <button 
-                    onClick={() => setActiveTab('url')}
-                    className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium border-b-2 transition-all hover:bg-slate-50 whitespace-nowrap ${activeTab === 'url' ? 'border-primary-500 text-primary-700 bg-white' : 'border-transparent text-slate-500'}`}
-                >
-                    <LinkIcon size={16} /> Fetch URL
                 </button>
             </div>
 
@@ -117,67 +167,129 @@ export const StepInput: React.FC<StepInputProps> = ({ value, context, onValueCha
                     </div>
                 )}
 
-                {activeTab === 'url' && (
-                    <div className="flex-1 flex flex-col p-8 min-h-[300px]">
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Metrics Endpoint URL</label>
-                        <div className="flex gap-2">
-                            <input 
-                                type="url" 
-                                className="flex-1 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                                placeholder="https://example.com/metrics"
-                                value={urlInput}
-                                onChange={(e) => setUrlInput(e.target.value)}
-                            />
-                            <button 
-                                onClick={handleUrlFetch}
-                                className="bg-slate-800 text-white px-6 rounded-lg hover:bg-slate-700 transition-colors font-medium"
-                            >
-                                Fetch
-                            </button>
-                        </div>
-                        {urlError && (
-                            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
-                                <AlertCircle className="text-amber-600 shrink-0 mt-0.5" size={18} />
-                                <p className="text-sm text-amber-800">{urlError}</p>
-                            </div>
-                        )}
-                        <p className="mt-6 text-xs text-slate-400">
-                            Note: Fetching from external URLs requires the endpoint to support CORS (Cross-Origin Resource Sharing). If fetch fails, please copy the text manually.
-                        </p>
-                    </div>
-                )}
             </div>
         </div>
 
-        {/* Right Column: Context & Action */}
-        <div className="flex flex-col gap-6">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex-1 flex flex-col min-h-[200px]">
-                <h3 className="text-lg font-bold text-slate-800 mb-2">Instructions (Optional)</h3>
-                <p className="text-sm text-slate-500 mb-4">
-                    Tell the AI what to focus on. e.g., "This is a JVM app, focus on Garbage Collection" or "Use the RED method."
-                </p>
-                <textarea
-                    className="flex-1 w-full p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 resize-none focus:ring-2 focus:ring-primary-500 outline-none transition-all min-h-[120px]"
-                    placeholder="E.g., Group panels by service name, focus on 99th percentile latency..."
-                    value={context}
-                    onChange={(e) => onContextChange(e.target.value)}
-                />
-            </div>
+        {/* Right Column: Parsed Metrics Preview */}
+        <div className="flex flex-col gap-4">
+            {parsedMetrics.length > 0 ? (
+              <>
+                {/* Metrics Summary */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                  <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <Hash size={16} className="text-primary-500" />
+                    Parsed Metrics
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="bg-slate-50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-primary-600">{selectedMetrics.size}</div>
+                      <div className="text-xs text-slate-500">Selected</div>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-slate-800">{parsedMetrics.length}</div>
+                      <div className="text-xs text-slate-500">Total</div>
+                    </div>
+                  </div>
+                  {/* Select All / None */}
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={selectAll}
+                      className="flex-1 text-[10px] font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 py-1.5 rounded transition-colors"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={selectNone}
+                      className="flex-1 text-[10px] font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 py-1.5 rounded transition-colors"
+                    >
+                      Select None
+                    </button>
+                  </div>
+                </div>
 
-            <button
-                onClick={onGenerate}
-                disabled={!value.trim()}
-                className={`
-                    w-full py-5 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-3
-                    ${!value.trim() 
-                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
-                        : 'bg-gradient-to-r from-primary-600 to-primary-500 text-white hover:from-primary-700 hover:to-primary-600 hover:shadow-primary-500/30 transform hover:-translate-y-0.5 active:translate-y-0'
-                    }
-                `}
-            >
-                <Play size={24} fill="currentColor" />
-                Start Generation
-            </button>
+                {/* Metrics by Type */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col min-h-[200px]">
+                  <div className="p-3 border-b border-slate-100 bg-slate-50">
+                    <h4 className="text-xs font-semibold text-slate-600 uppercase">By Type</h4>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {(Object.entries(metricsByType) as [string, ParsedMetric[]][]).map(([type, metrics]) => {
+                      const Icon = getTypeIcon(type);
+                      const colorClass = getTypeColor(type);
+                      const selectedInType = metrics.filter(m => selectedMetrics.has(m.name)).length;
+                      const allSelectedInType = selectedInType === metrics.length;
+                      return (
+                        <details key={type} className="group">
+                          <summary className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-slate-50 ${colorClass.split(' ')[1]}`}>
+                            <ChevronRight size={14} className="text-slate-400 group-open:rotate-90 transition-transform" />
+                            <Icon size={14} className={colorClass.split(' ')[0]} />
+                            <span className="text-xs font-medium text-slate-700 flex-1">{type}</span>
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${selectedInType === metrics.length ? 'bg-primary-100 text-primary-600' : 'text-slate-400'}`}>
+                              {selectedInType}/{metrics.length}
+                            </span>
+                          </summary>
+                          <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-slate-100 pl-2">
+                            {/* Type Select All */}
+                            <button
+                              onClick={(e) => { e.preventDefault(); toggleTypeAll(metrics); }}
+                              className="text-[10px] text-primary-600 hover:text-primary-700 font-medium py-1"
+                            >
+                              {allSelectedInType ? 'Deselect all' : 'Select all'} {type}
+                            </button>
+                            {/* Metric Items */}
+                            {metrics.map((m, i) => {
+                              const isSelected = selectedMetrics.has(m.name);
+                              return (
+                                <label 
+                                  key={i} 
+                                  className={`flex items-center gap-2 py-1 px-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-primary-50' : 'hover:bg-slate-50'}`}
+                                  title={m.help || m.name}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleMetric(m.name)}
+                                    className="w-3 h-3 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                                  />
+                                  <span className={`text-[10px] font-mono truncate ${isSelected ? 'text-slate-700' : 'text-slate-500'}`}>
+                                    {m.name}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Generate Button */}
+                <button
+                  onClick={onGenerate}
+                  disabled={selectedMetrics.size === 0}
+                  className={`w-full py-4 rounded-xl font-bold text-base shadow-lg transition-all flex items-center justify-center gap-3 ${
+                    selectedMetrics.size === 0
+                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-primary-600 to-primary-500 text-white hover:from-primary-700 hover:to-primary-600 hover:shadow-primary-500/30 transform hover:-translate-y-0.5 active:translate-y-0'
+                  }`}
+                >
+                  <Play size={20} fill="currentColor" />
+                  Generate Plan ({selectedMetrics.size} metrics)
+                </button>
+              </>
+            ) : (
+              /* Empty State */
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex-1 flex flex-col items-center justify-center text-center min-h-[300px]">
+                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                  <FileText size={28} className="text-slate-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-700 mb-2">No Metrics Yet</h3>
+                <p className="text-sm text-slate-500 max-w-xs">
+                  Paste your Prometheus metrics on the left, or upload a file. The parsed metrics will appear here.
+                </p>
+              </div>
+            )}
         </div>
     </div>
   );

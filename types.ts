@@ -3,6 +3,7 @@ export enum PanelType {
   Stat = 'stat',
   Gauge = 'gauge',
   Heatmap = 'heatmap',
+  Histogram = 'histogram',
   Logs = 'logs'
 }
 
@@ -63,6 +64,8 @@ export interface GrafanaTarget {
   expr: string;
   refId: string;
   legendFormat?: string;
+  instant?: boolean;
+  format?: string;
 }
 
 export interface GrafanaPanel {

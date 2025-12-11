@@ -4,7 +4,7 @@ import { PanelPreview } from './PanelPreview';
 import { buildGrafanaDashboardJson } from '../services/grafanaBuilder';
 import { 
   Download, Copy, Check, LayoutDashboard, Settings2, 
-  ChevronRight, ChevronDown, CheckCircle, Circle, Eye, EyeOff
+  ChevronRight, ChevronDown, CheckCircle, Circle, Eye, EyeOff, HelpCircle, X
 } from 'lucide-react';
 
 interface DashboardPreviewProps {
@@ -16,6 +16,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({ data }) => {
   const [activePanels, setActivePanels] = useState<Set<number>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [showSidebar, setShowSidebar] = useState(true);
+  const [showHelp, setShowHelp] = useState(false);
 
   // Initialize active panels when data loads
   useEffect(() => {
@@ -59,11 +60,29 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({ data }) => {
     URL.revokeObjectURL(url);
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     const json = buildGrafanaDashboardJson(getFilteredData());
-    navigator.clipboard.writeText(JSON.stringify(json, null, 2));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const text = JSON.stringify(json, null, 2);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for environments without clipboard API permission
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Copy failed", err);
+      alert("Copy failed. Please copy manually.");
+    }
   };
 
   const togglePanel = (idx: number) => {
@@ -83,6 +102,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({ data }) => {
   // Helper to keep track of global index for mapping sidebar to main view
   let sidebarGlobalIdx = 0;
   let mainGlobalIdx = 0;
+  const visiblePanelCount = activePanels.size;
 
   return (
     <div className="flex h-full bg-slate-50 overflow-hidden border-t border-slate-200">
@@ -148,37 +168,52 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({ data }) => {
       {/* Main Preview Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Toolbar */}
-        <div className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shadow-sm z-10">
-            <div className="flex items-center gap-4">
-                <button 
-                    onClick={() => setShowSidebar(!showSidebar)}
-                    className={`p-2 rounded-lg transition-colors ${showSidebar ? 'bg-primary-50 text-primary-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                    title="Toggle Sidebar"
+        <div className="p-3 border-b border-slate-100 flex flex-wrap gap-3 items-start md:items-center justify-between bg-white">
+          <div className="flex items-start md:items-center gap-3 min-w-0">
+            <button
+              onClick={() => setShowSidebar(!showSidebar)}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              title={showSidebar ? 'Hide sidebar' : 'Show sidebar'}
+            >
+              <ChevronRight size={18} className={`text-slate-500 transition-transform ${showSidebar ? 'rotate-180' : ''}`} />
+            </button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="font-bold text-slate-800">{data.dashboardTitle}</h2>
+                <span
+                  className="text-[11px] font-semibold text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2.5 py-0.5 whitespace-nowrap"
+                  title="Mock data for demo; not live metrics"
                 >
-                    <Settings2 size={18} />
-                </button>
-                <div>
-                    <h2 className="text-lg font-bold text-slate-800 leading-tight">{data.dashboardTitle}</h2>
-                    <p className="text-xs text-slate-500">{data.dashboardDescription}</p>
-                </div>
+                  Demo data (mock)
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">{visiblePanelCount} panels selected</p>
             </div>
-
-            <div className="flex gap-2">
-                <button 
-                    onClick={handleCopy}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-all"
-                >
-                    {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
-                    {copied ? 'Copied' : 'Copy JSON'}
-                </button>
-                <button 
-                    onClick={handleDownload}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 shadow-sm rounded-lg transition-all"
-                >
-                    <Download size={16} />
-                    Download JSON
-                </button>
-            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowHelp(true)}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-all"
+              title="How to import JSON to Grafana"
+            >
+              <HelpCircle size={16} />
+              How to use
+            </button>
+            <button 
+              onClick={handleCopy}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-all"
+            >
+              {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
+              {copied ? 'Copied' : 'Copy JSON'}
+            </button>
+            <button 
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 shadow-sm rounded-lg transition-all"
+            >
+              <Download size={16} />
+              Download JSON
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Content */}
@@ -206,18 +241,15 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({ data }) => {
                             <LayoutDashboard size={14} />
                             {category.name}
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {sortedPanelsWithIndices.map((panel, pIdx) => {
-                                const isStat = panel.type === PanelType.Stat || panel.type === PanelType.Gauge;
-                                return (
-                                    <div 
-                                        key={panel.originalIdx} 
-                                        className={isStat ? "col-span-1" : "col-span-1 md:col-span-2"}
-                                    >
-                                        <PanelPreview panel={panel} />
-                                    </div>
-                                );
-                            })}
+                        <div 
+                            className="grid gap-4"
+                            style={{ gridTemplateColumns: `repeat(auto-fit, minmax(180px, 1fr))` }}
+                        >
+                            {sortedPanelsWithIndices.map((panel) => (
+                                <div key={panel.originalIdx}>
+                                    <PanelPreview panel={panel} />
+                                </div>
+                            ))}
                         </div>
                     </div>
                 );
@@ -232,6 +264,34 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({ data }) => {
             )}
         </div>
       </div>
+      {showHelp && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl border border-slate-200">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+              <div>
+                <p className="text-xs uppercase text-slate-400 font-semibold">Help</p>
+                <h4 className="text-lg font-bold text-slate-800">Import JSON into Grafana</h4>
+              </div>
+              <button
+                onClick={() => setShowHelp(false)}
+                className="p-2 text-slate-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                aria-label="Close help"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 space-y-3 text-sm text-slate-600">
+              <ol className="list-decimal list-inside space-y-2">
+                <li>In Grafana sidebar, click <b>+ Create</b> → <b>Import</b>.</li>
+                <li>Choose <b>Upload JSON file</b> (or paste JSON) and select the downloaded <code>grafana-dashboard-*.json</code>.</li>
+                <li>Select the target <b>Prometheus datasource</b> (or replace the <code>${'{'}datasource{'}'}</code> placeholder in JSON).</li>
+                <li>Click <b>Import</b> to load the dashboard and view panels.</li>
+              </ol>
+              <p className="text-xs text-slate-500">Tip: If clipboard access is blocked, use Download JSON and import the file instead.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
