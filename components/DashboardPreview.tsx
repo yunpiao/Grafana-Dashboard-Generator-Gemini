@@ -234,7 +234,11 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({ data }) => {
                         </h3>
                         <div 
                             className="grid gap-4"
-                            style={{ gridTemplateColumns: `repeat(auto-fit, minmax(180px, 1fr))` }}
+                            style={{ gridTemplateColumns: `repeat(${
+                              activePanelsInCategory.length <= 4 ? activePanelsInCategory.length :
+                              activePanelsInCategory.length <= 6 ? 3 :
+                              4
+                            }, 1fr)` }}
                         >
                             {sortedPanelsWithIndices.map((panel) => (
                                 <div key={panel.originalIdx}>

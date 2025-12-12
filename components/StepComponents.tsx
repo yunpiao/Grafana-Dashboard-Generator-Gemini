@@ -131,18 +131,15 @@ export const StepInput: React.FC<StepInputProps> = ({ value, onValueChange, onGe
                             onChange={(e) => onValueChange(e.target.value)}
                         />
                         
-                        {/* Center Overlay for Empty State */}
+                        {/* Load Sample Button - small and non-intrusive */}
                         {value.length === 0 && (
-                            <div className="absolute inset-0 flex items-center justify-center z-10">
-                                <div className="text-center p-6 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-slate-100">
-                                    <p className="text-sm text-slate-500 font-medium mb-4">Paste your Prometheus metrics above</p>
-                                    <button
-                                        onClick={() => onValueChange(SAMPLE_METRICS)}
-                                        className="px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-500 text-white text-sm font-semibold rounded-lg shadow hover:from-primary-700 hover:to-primary-600 transition-all"
-                                    >
-                                        Load Node Exporter Sample
-                                    </button>
-                                </div>
+                            <div className="absolute top-6 right-6 z-10">
+                                <button
+                                    onClick={() => onValueChange(SAMPLE_METRICS)}
+                                    className="px-2 py-1 text-xs text-slate-500 hover:text-primary-600 border border-slate-200 hover:border-primary-300 bg-white/90 rounded transition-all"
+                                >
+                                    Load Sample
+                                </button>
                             </div>
                         )}
 

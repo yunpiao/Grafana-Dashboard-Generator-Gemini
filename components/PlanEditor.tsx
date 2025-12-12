@@ -70,10 +70,10 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ plan, onPlanChange, onCo
         <div>
           <h2 className="font-bold text-xl text-slate-800 tracking-tight">{plan.dashboardTitle}</h2>
           <div className="flex items-center gap-2 mt-1">
-            <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-medium">
+            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-200 rounded text-xs font-medium">
               {plan.categories.length} Categories
             </span>
-            <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-medium">
+            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded text-xs font-medium">
               {totalPanels} Panels
             </span>
           </div>
@@ -175,7 +175,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ plan, onPlanChange, onCo
 
                         {/* PromQL Section */}
                         <div className="border-t border-slate-100 bg-slate-50 px-4 py-2">
-                          <div className="text-[10px] font-semibold text-slate-400 mb-1">PROMQL</div>
+                          <div className="text-[10px] font-semibold text-amber-600 mb-1">PROMQL</div>
                           <input
                             type="text"
                             value={panel.promql_hint}
