@@ -178,26 +178,17 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({ data }) => {
               <ChevronRight size={18} className={`text-slate-500 transition-transform ${showSidebar ? 'rotate-180' : ''}`} />
             </button>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="font-bold text-slate-800">{data.dashboardTitle}</h2>
-                <span
-                  className="text-[11px] font-semibold text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2.5 py-0.5 whitespace-nowrap"
-                  title="Mock data for demo; not live metrics"
-                >
-                  Demo data (mock)
-                </span>
-              </div>
+              <h2 className="font-bold text-slate-800">{data.dashboardTitle}</h2>
               <p className="text-xs text-slate-500">{visiblePanelCount} panels selected</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowHelp(true)}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-all"
+              className="flex items-center justify-center w-9 h-9 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
               title="How to import JSON to Grafana"
             >
-              <HelpCircle size={16} />
-              How to use
+              <HelpCircle size={18} />
             </button>
             <button 
               onClick={handleCopy}

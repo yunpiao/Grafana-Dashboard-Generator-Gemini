@@ -27,7 +27,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ logs }) => {
       <h3 className="text-2xl font-bold text-slate-800 mb-2">
         AI is working{dots}
       </h3>
-      <p className="text-slate-500 mb-8">This usually takes about 10-15 seconds.</p>
+      <p className="text-slate-500 mb-8">This may take up to 1 minute.</p>
 
       {/* Terminal Log View */}
       <div className="w-full bg-slate-900 rounded-lg p-4 font-mono text-sm shadow-xl border border-slate-800 overflow-hidden">

@@ -1,169 +1,96 @@
-import { DashboardPlan, AIResponse, PanelType } from './types';
+// Node Exporter sample metrics for quick demo
+export const SAMPLE_METRICS = `# HELP node_cpu_seconds_total Seconds the CPUs spent in each mode.
+# TYPE node_cpu_seconds_total counter
+node_cpu_seconds_total{cpu="0",mode="idle"} 78245.67
+node_cpu_seconds_total{cpu="0",mode="iowait"} 512.34
+node_cpu_seconds_total{cpu="0",mode="system"} 3456.78
+node_cpu_seconds_total{cpu="0",mode="user"} 12345.67
+node_cpu_seconds_total{cpu="1",mode="idle"} 77890.12
+node_cpu_seconds_total{cpu="1",mode="iowait"} 498.76
+node_cpu_seconds_total{cpu="1",mode="system"} 3234.56
+node_cpu_seconds_total{cpu="1",mode="user"} 11987.34
 
-// Real etcd metrics sample - a cohesive set from a single service
-export const SAMPLE_METRICS = `# HELP etcd_server_has_leader Whether or not a leader exists. 1 is existence, 0 is not.
-# TYPE etcd_server_has_leader gauge
-etcd_server_has_leader 1
-# HELP etcd_server_is_leader Whether or not this member is a leader. 1 if is, 0 otherwise.
-# TYPE etcd_server_is_leader gauge
-etcd_server_is_leader 1
-# HELP etcd_server_leader_changes_seen_total The number of leader changes seen.
-# TYPE etcd_server_leader_changes_seen_total counter
-etcd_server_leader_changes_seen_total 1
-# HELP etcd_server_proposals_applied_total The total number of consensus proposals applied.
-# TYPE etcd_server_proposals_applied_total gauge
-etcd_server_proposals_applied_total 112
-# HELP etcd_server_proposals_pending The current number of pending proposals to commit.
-# TYPE etcd_server_proposals_pending gauge
-etcd_server_proposals_pending 0
+# HELP node_memory_MemTotal_bytes Memory information field MemTotal_bytes.
+# TYPE node_memory_MemTotal_bytes gauge
+node_memory_MemTotal_bytes 1.6777216e+10
+# HELP node_memory_MemAvailable_bytes Memory information field MemAvailable_bytes.
+# TYPE node_memory_MemAvailable_bytes gauge
+node_memory_MemAvailable_bytes 8.589934592e+09
+# HELP node_memory_MemFree_bytes Memory information field MemFree_bytes.
+# TYPE node_memory_MemFree_bytes gauge
+node_memory_MemFree_bytes 2.147483648e+09
+# HELP node_memory_Buffers_bytes Memory information field Buffers_bytes.
+# TYPE node_memory_Buffers_bytes gauge
+node_memory_Buffers_bytes 5.36870912e+08
+# HELP node_memory_Cached_bytes Memory information field Cached_bytes.
+# TYPE node_memory_Cached_bytes gauge
+node_memory_Cached_bytes 5.36870912e+09
 
-# HELP etcd_mvcc_db_total_size_in_bytes Total size of the underlying database physically allocated in bytes.
-# TYPE etcd_mvcc_db_total_size_in_bytes gauge
-etcd_mvcc_db_total_size_in_bytes 20480
-# HELP etcd_debugging_mvcc_keys_total Total number of keys.
-# TYPE etcd_debugging_mvcc_keys_total gauge
-etcd_debugging_mvcc_keys_total 0
-# HELP etcd_mvcc_range_total Total number of ranges seen by this member.
-# TYPE etcd_mvcc_range_total counter
-etcd_mvcc_range_total 108
-# HELP etcd_mvcc_put_total Total number of puts seen by this member.
-# TYPE etcd_mvcc_put_total counter
-etcd_mvcc_put_total 0
+# HELP node_filesystem_size_bytes Filesystem size in bytes.
+# TYPE node_filesystem_size_bytes gauge
+node_filesystem_size_bytes{device="/dev/sda1",fstype="ext4",mountpoint="/"} 1.073741824e+11
+node_filesystem_size_bytes{device="/dev/sdb1",fstype="ext4",mountpoint="/data"} 5.36870912e+11
+# HELP node_filesystem_avail_bytes Filesystem space available to non-root users in bytes.
+# TYPE node_filesystem_avail_bytes gauge
+node_filesystem_avail_bytes{device="/dev/sda1",fstype="ext4",mountpoint="/"} 5.36870912e+10
+node_filesystem_avail_bytes{device="/dev/sdb1",fstype="ext4",mountpoint="/data"} 4.294967296e+11
 
-# HELP grpc_server_started_total Total number of RPCs started on the server.
-# TYPE grpc_server_started_total counter
-grpc_server_started_total{grpc_method="Range",grpc_service="etcdserverpb.KV",grpc_type="unary"} 106
-grpc_server_started_total{grpc_method="Alarm",grpc_service="etcdserverpb.Maintenance",grpc_type="unary"} 106
-grpc_server_started_total{grpc_method="Put",grpc_service="etcdserverpb.KV",grpc_type="unary"} 0
-grpc_server_started_total{grpc_method="Watch",grpc_service="etcdserverpb.Watch",grpc_type="bidi_stream"} 0
-# HELP etcd_network_client_grpc_received_bytes_total The total number of bytes received from grpc clients.
-# TYPE etcd_network_client_grpc_received_bytes_total counter
-etcd_network_client_grpc_received_bytes_total 864
-# HELP etcd_network_client_grpc_sent_bytes_total The total number of bytes sent to grpc clients.
-# TYPE etcd_network_client_grpc_sent_bytes_total counter
-etcd_network_client_grpc_sent_bytes_total 5832
+# HELP node_disk_read_bytes_total The total number of bytes read successfully.
+# TYPE node_disk_read_bytes_total counter
+node_disk_read_bytes_total{device="sda"} 1.073741824e+10
+node_disk_read_bytes_total{device="sdb"} 5.36870912e+09
+# HELP node_disk_written_bytes_total The total number of bytes written successfully.
+# TYPE node_disk_written_bytes_total counter
+node_disk_written_bytes_total{device="sda"} 2.147483648e+10
+node_disk_written_bytes_total{device="sdb"} 1.073741824e+10
+# HELP node_disk_io_time_seconds_total Total seconds spent doing I/Os.
+# TYPE node_disk_io_time_seconds_total counter
+node_disk_io_time_seconds_total{device="sda"} 12345.67
+node_disk_io_time_seconds_total{device="sdb"} 6789.01
 
-# HELP etcd_disk_wal_fsync_duration_seconds The latency distributions of fsync called by WAL.
-# TYPE etcd_disk_wal_fsync_duration_seconds histogram
-etcd_disk_wal_fsync_duration_seconds_bucket{le="0.001"} 0
-etcd_disk_wal_fsync_duration_seconds_bucket{le="0.002"} 1
-etcd_disk_wal_fsync_duration_seconds_bucket{le="0.004"} 100
-etcd_disk_wal_fsync_duration_seconds_bucket{le="0.008"} 113
-etcd_disk_wal_fsync_duration_seconds_bucket{le="0.016"} 113
-etcd_disk_wal_fsync_duration_seconds_bucket{le="0.032"} 113
-etcd_disk_wal_fsync_duration_seconds_bucket{le="0.064"} 113
-etcd_disk_wal_fsync_duration_seconds_bucket{le="0.128"} 113
-etcd_disk_wal_fsync_duration_seconds_bucket{le="0.256"} 113
-etcd_disk_wal_fsync_duration_seconds_bucket{le="0.512"} 114
-etcd_disk_wal_fsync_duration_seconds_bucket{le="+Inf"} 114
-etcd_disk_wal_fsync_duration_seconds_sum 0.705
-etcd_disk_wal_fsync_duration_seconds_count 114
-# HELP etcd_disk_backend_commit_duration_seconds The latency distributions of commit called by backend.
-# TYPE etcd_disk_backend_commit_duration_seconds histogram
-etcd_disk_backend_commit_duration_seconds_bucket{le="0.001"} 0
-etcd_disk_backend_commit_duration_seconds_bucket{le="0.002"} 0
-etcd_disk_backend_commit_duration_seconds_bucket{le="0.004"} 0
-etcd_disk_backend_commit_duration_seconds_bucket{le="0.008"} 5
-etcd_disk_backend_commit_duration_seconds_bucket{le="0.016"} 6
-etcd_disk_backend_commit_duration_seconds_bucket{le="0.032"} 6
-etcd_disk_backend_commit_duration_seconds_bucket{le="+Inf"} 6
-etcd_disk_backend_commit_duration_seconds_sum 0.043
-etcd_disk_backend_commit_duration_seconds_count 6
+# HELP node_network_receive_bytes_total Network device statistic receive_bytes.
+# TYPE node_network_receive_bytes_total counter
+node_network_receive_bytes_total{device="eth0"} 1.073741824e+11
+node_network_receive_bytes_total{device="lo"} 1.073741824e+08
+# HELP node_network_transmit_bytes_total Network device statistic transmit_bytes.
+# TYPE node_network_transmit_bytes_total counter
+node_network_transmit_bytes_total{device="eth0"} 5.36870912e+10
+node_network_transmit_bytes_total{device="lo"} 1.073741824e+08
 
-# HELP process_resident_memory_bytes Resident memory size in bytes.
-# TYPE process_resident_memory_bytes gauge
-process_resident_memory_bytes 3.930112e+07
-# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
-# TYPE process_cpu_seconds_total counter
-process_cpu_seconds_total 3.43
-# HELP process_open_fds Number of open file descriptors.
-# TYPE process_open_fds gauge
-process_open_fds 19
+# HELP node_load1 1m load average.
+# TYPE node_load1 gauge
+node_load1 1.25
+# HELP node_load5 5m load average.
+# TYPE node_load5 gauge
+node_load5 0.89
+# HELP node_load15 15m load average.
+# TYPE node_load15 gauge
+node_load15 0.67
+
+# HELP node_boot_time_seconds Node boot time, in unixtime.
+# TYPE node_boot_time_seconds gauge
+node_boot_time_seconds 1.702300000e+09
+
+# HELP node_time_seconds System time in seconds since epoch (1970).
+# TYPE node_time_seconds gauge
+node_time_seconds 1.733980000e+09
+
+# HELP node_uname_info Labeled system information as provided by the uname system call.
+# TYPE node_uname_info gauge
+node_uname_info{domainname="(none)",machine="x86_64",nodename="node-1",release="5.15.0-generic",sysname="Linux",version="#1 SMP"} 1
+
+# HELP node_filefd_allocated File descriptor statistics: allocated.
+# TYPE node_filefd_allocated gauge
+node_filefd_allocated 4096
+# HELP node_filefd_maximum File descriptor statistics: maximum.
+# TYPE node_filefd_maximum gauge
+node_filefd_maximum 1048576
+
+# HELP node_scrape_collector_duration_seconds Duration of a collector scrape.
+# TYPE node_scrape_collector_duration_seconds gauge
+node_scrape_collector_duration_seconds{collector="cpu"} 0.012
+node_scrape_collector_duration_seconds{collector="meminfo"} 0.003
+node_scrape_collector_duration_seconds{collector="diskstats"} 0.008
+node_scrape_collector_duration_seconds{collector="filesystem"} 0.015
+node_scrape_collector_duration_seconds{collector="netdev"} 0.005
 `;
-
-// Check if input is sample data (compare trimmed content)
-export const isSampleData = (input: string): boolean => {
-  return input.trim() === SAMPLE_METRICS.trim();
-};
-
-// Sample Dashboard Plan (for quick UI validation) - etcd themed
-export const SAMPLE_DASHBOARD_PLAN: DashboardPlan = {
-  dashboardTitle: "etcd Cluster Dashboard",
-  dashboardDescription: "Auto-generated dashboard for etcd cluster monitoring",
-  categories: [
-    {
-      name: "Cluster Health",
-      panels: [
-        { id: "1", title: "Has Leader", type: PanelType.Stat, description: "Whether a leader exists (1=yes)", metrics: ["etcd_server_has_leader"], promql_hint: "etcd_server_has_leader" },
-        { id: "2", title: "Is Leader", type: PanelType.Stat, description: "Whether this node is leader", metrics: ["etcd_server_is_leader"], promql_hint: "etcd_server_is_leader" },
-        { id: "3", title: "Leader Changes", type: PanelType.Stat, description: "Total leader elections", metrics: ["etcd_server_leader_changes_seen_total"], promql_hint: "etcd_server_leader_changes_seen_total" },
-        { id: "4", title: "Pending Proposals", type: PanelType.Gauge, description: "Proposals waiting to commit", metrics: ["etcd_server_proposals_pending"], promql_hint: "etcd_server_proposals_pending" },
-      ]
-    },
-    {
-      name: "gRPC Traffic",
-      panels: [
-        { id: "5", title: "gRPC Request Rate", type: PanelType.Timeseries, description: "gRPC requests per second by method", metrics: ["grpc_server_started_total"], promql_hint: "rate(grpc_server_started_total[5m]) by (grpc_method)" },
-        { id: "6", title: "Network Bytes", type: PanelType.Timeseries, description: "gRPC bytes sent/received", metrics: ["etcd_network_client_grpc_received_bytes_total", "etcd_network_client_grpc_sent_bytes_total"], promql_hint: "rate(etcd_network_client_grpc_*_bytes_total[5m])" },
-      ]
-    },
-    {
-      name: "Disk I/O",
-      panels: [
-        { id: "7", title: "WAL Fsync Latency Heatmap", type: PanelType.Heatmap, description: "WAL fsync duration distribution over time", metrics: ["etcd_disk_wal_fsync_duration_seconds_bucket"], promql_hint: "sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m])) by (le)" },
-        { id: "8", title: "WAL Fsync P99", type: PanelType.Timeseries, description: "99th percentile WAL fsync latency", metrics: ["etcd_disk_wal_fsync_duration_seconds_bucket"], promql_hint: "histogram_quantile(0.99, ...)" },
-        { id: "9", title: "Backend Commit Histogram", type: PanelType.Histogram, description: "Backend commit duration distribution", metrics: ["etcd_disk_backend_commit_duration_seconds_bucket"], promql_hint: "sum by (le) (etcd_disk_backend_commit_duration_seconds_bucket)" },
-      ]
-    },
-    {
-      name: "Resources",
-      panels: [
-        { id: "10", title: "DB Size", type: PanelType.Stat, description: "Total database size", metrics: ["etcd_mvcc_db_total_size_in_bytes"], promql_hint: "etcd_mvcc_db_total_size_in_bytes" },
-        { id: "11", title: "Memory Usage", type: PanelType.Gauge, description: "Resident memory", metrics: ["process_resident_memory_bytes"], promql_hint: "process_resident_memory_bytes" },
-        { id: "12", title: "Open FDs", type: PanelType.Stat, description: "Open file descriptors", metrics: ["process_open_fds"], promql_hint: "process_open_fds" },
-        { id: "13", title: "CPU Rate", type: PanelType.Stat, description: "CPU usage rate", metrics: ["process_cpu_seconds_total"], promql_hint: "rate(process_cpu_seconds_total[5m])" },
-      ]
-    }
-  ]
-};
-
-// Sample Dashboard Result (for quick UI validation) - etcd themed
-export const SAMPLE_DASHBOARD_RESULT: AIResponse = {
-  dashboardTitle: "etcd Cluster Dashboard",
-  dashboardDescription: "Auto-generated dashboard for etcd cluster monitoring",
-  categories: [
-    {
-      name: "Cluster Health",
-      panels: [
-        { title: "Has Leader", type: PanelType.Stat, description: "Whether a leader exists (1=yes)", promql: "etcd_server_has_leader", unit: "bool", metrics: ["etcd_server_has_leader"] },
-        { title: "Is Leader", type: PanelType.Stat, description: "Whether this node is leader", promql: "etcd_server_is_leader", unit: "bool", metrics: ["etcd_server_is_leader"] },
-        { title: "Leader Changes", type: PanelType.Stat, description: "Total leader elections seen", promql: "etcd_server_leader_changes_seen_total", unit: "short", metrics: ["etcd_server_leader_changes_seen_total"] },
-        { title: "Pending Proposals", type: PanelType.Gauge, description: "Current proposals waiting to commit", promql: "etcd_server_proposals_pending", unit: "short", metrics: ["etcd_server_proposals_pending"] },
-      ]
-    },
-    {
-      name: "gRPC Traffic",
-      panels: [
-        { title: "gRPC Request Rate", type: PanelType.Timeseries, description: "gRPC requests per second by method", promql: "sum by(grpc_method) (rate(grpc_server_started_total[5m]))", unit: "reqps", metrics: ["grpc_server_started_total"] },
-        { title: "Network Bytes", type: PanelType.Timeseries, description: "gRPC bytes sent and received per second", promql: "rate(etcd_network_client_grpc_received_bytes_total[5m]) or rate(etcd_network_client_grpc_sent_bytes_total[5m])", unit: "Bps", metrics: ["etcd_network_client_grpc_received_bytes_total", "etcd_network_client_grpc_sent_bytes_total"] },
-      ]
-    },
-    {
-      name: "Disk I/O",
-      panels: [
-        { title: "WAL Fsync Latency Heatmap", type: PanelType.Heatmap, description: "WAL fsync duration distribution over time", promql: "sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m])) by (le)", unit: "s", metrics: ["etcd_disk_wal_fsync_duration_seconds_bucket"] },
-        { title: "WAL Fsync P99", type: PanelType.Timeseries, description: "99th percentile WAL fsync latency", promql: "histogram_quantile(0.99, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m])) by (le))", unit: "s", metrics: ["etcd_disk_wal_fsync_duration_seconds_bucket"] },
-        { title: "Backend Commit Histogram", type: PanelType.Histogram, description: "Backend commit duration distribution", promql: "sum by (le) (etcd_disk_backend_commit_duration_seconds_bucket)", unit: "s", metrics: ["etcd_disk_backend_commit_duration_seconds_bucket"] },
-      ]
-    },
-    {
-      name: "Resources",
-      panels: [
-        { title: "DB Size", type: PanelType.Stat, description: "Total etcd database size", promql: "etcd_mvcc_db_total_size_in_bytes", unit: "bytes", metrics: ["etcd_mvcc_db_total_size_in_bytes"] },
-        { title: "Memory Usage", type: PanelType.Gauge, description: "Resident memory usage", promql: "process_resident_memory_bytes", unit: "bytes", metrics: ["process_resident_memory_bytes"] },
-        { title: "Open FDs", type: PanelType.Stat, description: "Open file descriptors", promql: "process_open_fds", unit: "short", metrics: ["process_open_fds"] },
-        { title: "CPU Rate", type: PanelType.Stat, description: "CPU usage rate", promql: "rate(process_cpu_seconds_total[5m])", unit: "short", metrics: ["process_cpu_seconds_total"] },
-      ]
-    }
-  ]
-};
